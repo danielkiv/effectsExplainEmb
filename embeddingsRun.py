@@ -27,7 +27,7 @@ from mgwr.gwr import GWR, MGWR
 from mgwr.sel_bw import Sel_BW
 
 # --- Plotting Configuration ---
-size = 25 # Grid size for spatial plots
+SIZE = 25 # Grid size for spatial plots
 # Define percentiles for clipping raw SVC color scales
 PERCENTILE_LOWER = 1.0 # e.g., 1st percentile
 PERCENTILE_UPPER = 99.0 # e.g., 99th percentile
@@ -60,16 +60,17 @@ true_intercept_surface = true_coeffs_df["b0"].values.flatten()
 true_svc_x1_surface = true_coeffs_df["b1"].values.flatten()
 true_svc_x2_surface = true_coeffs_df["b2"].values.flatten()
 
-if not (true_intercept_surface.shape == (size*size,) and \
-        true_svc_x1_surface.shape == (size*size,) and \
-        true_svc_x2_surface.shape == (size*size,)):
-    print(f"FATAL ERROR: True coefficient surfaces do not match expected shape ({size*size},).")
+if not (true_intercept_surface.shape == (SIZE*SIZE,) and \
+        true_svc_x1_surface.shape == (SIZE*SIZE,) and \
+        true_svc_x2_surface.shape == (SIZE*SIZE,)):
+    print(f"FATAL ERROR: True coefficient surfaces do not match expected shape ({SIZE*SIZE},).")
     exit()
 
 print("Plotting true coefficients...")
 # --- FIX: Use plain text for true coefficient titles ---
 plot_s(
     [true_intercept_surface, true_svc_x1_surface, true_svc_x2_surface],
+    size=SIZE,
     vmin=1, vmax=5,
     title=["True Intercept (b0)", "True Coeff X1 (b1)", "True Coeff X2 (b2)"], # Plain text titles
     filename="true_coefficients.pdf",
@@ -190,7 +191,7 @@ for encoder in encoder_types:
                 if metrics: current_model_spatial_metrics.append(metrics)
 
             mlp_svc_interactions_raw = mlp_rslt.get_svc(col=original_feature_indices, coef_type="raw", include_primary=False)
-            if mlp_svc_interactions_raw is not None and mlp_svc_interactions_raw.shape == (size*size, len(original_feature_indices)):
+            if mlp_svc_interactions_raw is not None and mlp_svc_interactions_raw.shape == (SIZE*SIZE, len(original_feature_indices)):
                 vmin_x1_raw, vmax_x1_raw = np.nanpercentile(mlp_svc_interactions_raw[:, 0], [PERCENTILE_LOWER, PERCENTILE_UPPER])
                 vmin_x2_raw, vmax_x2_raw = np.nanpercentile(mlp_svc_interactions_raw[:, 1], [PERCENTILE_LOWER, PERCENTILE_UPPER])
                 print(f"MLP Raw SVC X1 clipped scale ({PERCENTILE_LOWER}-{PERCENTILE_UPPER}%): {vmin_x1_raw:.2f} to {vmax_x1_raw:.2f}")
@@ -205,6 +206,7 @@ for encoder in encoder_types:
 
                 # --- FIX: Use plain text titles ---
                 plot_s([est_intercept_mlp, mlp_svc_interactions_raw[:, 0], mlp_svc_interactions_raw[:, 1]],
+                       size=SIZE,
                        vmin=[None, vmin_x1_raw, vmin_x2_raw],
                        vmax=[None, vmax_x1_raw, vmax_x2_raw],
                        title=[f"MLP Intercept ({encoder})", f"MLP SVC X1 (Raw Clp {PERCENTILE_LOWER}-{PERCENTILE_UPPER}%, {encoder})", f"MLP SVC X2 (Raw Clp {PERCENTILE_LOWER}-{PERCENTILE_UPPER}%, {encoder})"],
@@ -212,7 +214,7 @@ for encoder in encoder_types:
                        experiment_dir=CURRENT_EXPERIMENT_DIR)
 
             mlp_svc_interactions_smooth = mlp_rslt.get_svc(col=original_feature_indices, coef_type="gwr", include_primary=False)
-            if mlp_svc_interactions_smooth is not None and mlp_svc_interactions_smooth.shape == (size*size, len(original_feature_indices)):
+            if mlp_svc_interactions_smooth is not None and mlp_svc_interactions_smooth.shape == (SIZE*SIZE, len(original_feature_indices)):
                 if mlp_svc_interactions_smooth[:, 0].shape == true_svc_x1_surface.shape:
                     metrics = calculate_spatial_metrics(true_svc_x1_surface, mlp_svc_interactions_smooth[:, 0], "SVC_X1_Smooth", encoder, "MLP")
                     if metrics: current_model_spatial_metrics.append(metrics)
@@ -222,6 +224,7 @@ for encoder in encoder_types:
 
                 # --- FIX: Use plain text titles ---
                 plot_s([est_intercept_mlp, mlp_svc_interactions_smooth[:, 0], mlp_svc_interactions_smooth[:, 1]],
+                       size=SIZE,
                        title=[f"MLP Intercept ({encoder})", f"MLP SVC X1 (Smooth, {encoder})", f"MLP SVC X2 (Smooth, {encoder})"],
                        filename="mlp_svc_smoothed.pdf", experiment_dir=CURRENT_EXPERIMENT_DIR)
         except Exception as e: print(f"Error during MLP GeoShapley explanation or metrics for {encoder}: {type(e).__name__}: {e}")
@@ -256,7 +259,7 @@ for encoder in encoder_types:
                 if metrics: current_model_spatial_metrics.append(metrics)
 
             xgb_svc_interactions_raw = xgb_rslt.get_svc(col=original_feature_indices, coef_type="raw", include_primary=False)
-            if xgb_svc_interactions_raw is not None and xgb_svc_interactions_raw.shape == (size*size, len(original_feature_indices)):
+            if xgb_svc_interactions_raw is not None and xgb_svc_interactions_raw.shape == (SIZE*SIZE, len(original_feature_indices)):
                 vmin_x1_raw_xgb, vmax_x1_raw_xgb = np.nanpercentile(xgb_svc_interactions_raw[:, 0], [PERCENTILE_LOWER, PERCENTILE_UPPER])
                 vmin_x2_raw_xgb, vmax_x2_raw_xgb = np.nanpercentile(xgb_svc_interactions_raw[:, 1], [PERCENTILE_LOWER, PERCENTILE_UPPER])
                 print(f"XGB Raw SVC X1 clipped scale ({PERCENTILE_LOWER}-{PERCENTILE_UPPER}%): {vmin_x1_raw_xgb:.2f} to {vmax_x1_raw_xgb:.2f}")
@@ -271,6 +274,7 @@ for encoder in encoder_types:
 
                 # --- FIX: Use plain text titles ---
                 plot_s([est_intercept_xgb, xgb_svc_interactions_raw[:, 0], xgb_svc_interactions_raw[:, 1]],
+                       size=SIZE,
                        vmin=[None, vmin_x1_raw_xgb, vmin_x2_raw_xgb],
                        vmax=[None, vmax_x1_raw_xgb, vmax_x2_raw_xgb],
                        title=[f"XGB Intercept ({encoder})", f"XGB SVC X1 (Raw Clp {PERCENTILE_LOWER}-{PERCENTILE_UPPER}%, {encoder})", f"XGB SVC X2 (Raw Clp {PERCENTILE_LOWER}-{PERCENTILE_UPPER}%, {encoder})"],
@@ -278,7 +282,7 @@ for encoder in encoder_types:
                        experiment_dir=CURRENT_EXPERIMENT_DIR)
 
             xgb_svc_interactions_smooth = xgb_rslt.get_svc(col=original_feature_indices, coef_type="gwr", include_primary=False)
-            if xgb_svc_interactions_smooth is not None and xgb_svc_interactions_smooth.shape == (size*size, len(original_feature_indices)):
+            if xgb_svc_interactions_smooth is not None and xgb_svc_interactions_smooth.shape == (SIZE*SIZE, len(original_feature_indices)):
                 if xgb_svc_interactions_smooth[:, 0].shape == true_svc_x1_surface.shape:
                     metrics = calculate_spatial_metrics(true_svc_x1_surface, xgb_svc_interactions_smooth[:, 0], "SVC_X1_Smooth", encoder, "XGBoost")
                     if metrics: current_model_spatial_metrics.append(metrics)
@@ -288,6 +292,7 @@ for encoder in encoder_types:
 
                 # --- FIX: Use plain text titles ---
                 plot_s([est_intercept_xgb, xgb_svc_interactions_smooth[:, 0], xgb_svc_interactions_smooth[:, 1]],
+                       size=SIZE,
                        title=[f"XGB Intercept ({encoder})", f"XGB SVC X1 (Smooth, {encoder})", f"XGB SVC X2 (Smooth, {encoder})"],
                        filename="xgb_svc_smoothed.pdf", experiment_dir=CURRENT_EXPERIMENT_DIR)
         except Exception as e: print(f"Error during XGBoost GeoShapley explanation or metrics for {encoder}: {type(e).__name__}: {e}")
@@ -368,7 +373,7 @@ if run_mgwr:
             mgwr_coeffs_to_plot = [mgwr_results.params[:, i] for i in range(mgwr_results.params.shape[1])]
             # --- FIX: Use plain text titles ---
             mgwr_titles = ["MGWR Intercept"] + [f"MGWR Coeff {col}" for col in X_features.columns]
-            plot_s(mgwr_coeffs_to_plot, vmin=1, vmax=5, title=mgwr_titles,
+            plot_s(mgwr_coeffs_to_plot, size=SIZE, vmin=1, vmax=5, title=mgwr_titles,
                    filename="mgwr_coefficient_estimates.pdf", experiment_dir=BASE_EXPERIMENT_DIR)
         else: print(f"Warning: MGWR params shape {mgwr_results.params.shape} unexpected. Skipping plot.")
         mgwr_summary_path = os.path.join(BASE_EXPERIMENT_DIR, "mgwr_summary.txt")

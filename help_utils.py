@@ -88,7 +88,7 @@ def get_loc_embeddings(coords, encoder_type, device='cpu'):
 # --- Plotting Function ---
 # plot_s function remains the same as in the previous version
 # (Handling list vmin/vmax, shape checks, saving logic)
-def plot_s(bs, vmin=None, vmax=None, title="", filename=None, experiment_dir=None):
+def plot_s(bs, size, vmin=None, vmax=None, title="", filename=None, experiment_dir=None):
     """
     Plots spatial coefficient surfaces and saves the figure to a specific directory.
     Now handles potential vmin/vmax being passed for individual plots via lists.
