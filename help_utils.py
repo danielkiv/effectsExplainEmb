@@ -348,7 +348,7 @@ def calculate_spatial_metrics(
                         residuals.shape[0] == grid_size * grid_size
                     ):  # Ensure it's for the full grid
                         w = weights.lat2W(
-                            nrows=grid_size, ncols=grid_size, criterion="queen"
+                            nrows=grid_size, ncols=grid_size, rook=False
                         )  # Use 'rook' for Rook contiguity
                         w.transform = "r"  # Row-standardize
                         moran_result = Moran(residuals, w, permutations=99)
