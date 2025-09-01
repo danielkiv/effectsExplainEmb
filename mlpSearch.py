@@ -4,8 +4,8 @@ from flaml.automl.model import SKLearnEstimator
 from flaml import tune
 
 # Helper class for FLAML to autotune MLPRegressor
-#  
-class MyMLP(SKLearnEstimator):
+
+class MLP(SKLearnEstimator):
     def __init__(self, task='regression', **config):
         super().__init__(task, **config)
         self.estimator_class = MLPRegressor
