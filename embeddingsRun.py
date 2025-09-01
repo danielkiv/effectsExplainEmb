@@ -9,7 +9,8 @@ from geoshapley import GeoShapleyExplainer
 from help_utils import get_loc_embeddings, plot_s, calculate_spatial_metrics
 from sklearn.model_selection import train_test_split
 from flaml import AutoML
-from mlpSearch import MLP
+from sklearn.neural_network import MLPRegressor
+from sklearn.model_selection import RandomizedSearchCV
 
 # --- Argument Parsing ---
 parser = argparse.ArgumentParser(
@@ -173,20 +174,32 @@ for (
                 original_coords.values, encoder_type=encoder, device="cpu"
             )
 
-            # This correctly handles both regular and ragged embeddings by placing them 
-            # into a single DataFrame column without causing an early error.
             if isinstance(embeddings, torch.Tensor):
+                # This path is correct for encoders that return a single tensor
                 embeddings_np = embeddings.detach().cpu().numpy()
-                emb_dim = embeddings_np.shape[1]
-                emb_cols = [f"{encoder}_emb_{i}" for i in range(emb_dim)]
-                X_embeddings = pd.DataFrame(
-                    embeddings_np, columns=emb_cols, index=original_coords.index
-                )
             else:
-                # For ragged lists, put the list of arrays into one column
-                X_embeddings = pd.DataFrame(
-                    {"embeddings": list(embeddings)}, index=original_coords.index
+                # --- THIS IS THE CORRECTED PART FOR OTHER ENCODERS ---
+                print("  Detected non-tensor embeddings. Stacking into a dense array for FLAML compatibility...")
+                # The embeddings are a list of arrays/tensors. Stack them into a single NumPy array.
+                # This resolves the "inhomogeneous shape" error.
+                embeddings_np = np.array(embeddings)
+                
+                # Squeeze out any extra dimensions if they exist (e.g., shape [625, 1, 12] -> [625, 12])
+                if embeddings_np.ndim > 2:
+                    embeddings_np = np.squeeze(embeddings_np)
+
+            # Ensure the result is a 2D matrix before creating the DataFrame
+            if embeddings_np.ndim != 2:
+                raise ValueError(
+                    f"Processed embeddings for encoder '{encoder}' are not a 2D array. Shape is {embeddings_np.shape}"
                 )
+            
+            emb_dim = embeddings_np.shape[1]
+            emb_cols = [f"{encoder}_emb_{i}" for i in range(emb_dim)]
+            X_embeddings = pd.DataFrame(
+                embeddings_np, columns=emb_cols, index=original_coords.index
+            )
+            print(f"  Successfully created fixed-size features of shape: {X_embeddings.shape}")
 
         except Exception as e:
             print(
@@ -219,24 +232,44 @@ for (
         ].values
 
         current_rep_model_metrics = {}  # For this repetition
-        # --- MLP Model ---
+ 
         print(f"\nTraining MLP model for {encoder}, repetition {rep_num}...")
-        # Use a different random_state for the MLP model in each repetition for model variability
-        automl_mlp = AutoML()
-        automl_mlp.add_learner(learner_name='mlp', learner_class=MLP)
-        mlp_settings = {
-            "time_budget": 60,  # in seconds
-            "metric": 'r2',
-            "task": 'regression',
-            "estimator_list": ['mlp'],
-            "verbose": 0, # Set to 3 for detailed logs
+        param_dist = {
+            'hidden_layer_sizes': [(50,), (100,), (50, 50), (100, 50)],
+            'activation': ['relu', 'tanh'],
+            'solver': ['adam', 'sgd'],
+            'alpha': [10**-x for x in range(1, 6)],  # e.g., 0.1, 0.01, ..., 0.00001
+            'learning_rate_init': [10**-x for x in range(2, 5)], # e.g., 0.01, 0.001, 0.0001
+            'max_iter': [500, 1000, 1500]
         }
+
+        # 2. Instantiate the MLP Regressor
+        mlp = MLPRegressor(random_state=current_random_state_split)
+
+        # 3. Set up RandomizedSearchCV
+        # It will try 25 different combinations from param_dist, using 3-fold cross-validation
+        # n_jobs=-1 uses all available CPU cores to speed things up
+        random_search = RandomizedSearchCV(
+            estimator=mlp,
+            param_distributions=param_dist,
+            n_iter=25,  # Number of parameter settings that are sampled.
+            cv=3,       # 3-fold cross-validation.
+            scoring='r2',
+            n_jobs=-1,
+            random_state=current_random_state_split,
+            error_score='raise' # Will raise an error if something goes wrong
+        )
+
         mlp_failed = False
         try:
-            automl_mlp.fit(X_train=X_train_ml, y_train=y_train, **mlp_settings)
-            print(f"  Best MLP learner: {automl_mlp.best_estimator}")
-            print(f"  Best MLP config: {automl_mlp.best_config}")
-            mlp_model = automl_mlp.model.estimator
+            # 4. Fit the model - This is the hyperparameter search
+            random_search.fit(X_train_ml, y_train)
+
+            # 5. Get the best model and its parameters
+            mlp_model = random_search.best_estimator_
+            print(f"  Best MLP learner found with R2: {random_search.best_score_:.4f}")
+            print(f"  Best MLP config: {random_search.best_params_}")
+
             mlp_train_score = mlp_model.score(X_train_ml, y_train)
             mlp_test_score = mlp_model.score(X_test_ml, y_test)
             current_rep_model_metrics["MLP"] = {
