@@ -9,6 +9,7 @@ from geoshapley import GeoShapleyExplainer
 from help_utils import get_loc_embeddings, plot_s, calculate_spatial_metrics
 from sklearn.model_selection import train_test_split
 from flaml import AutoML
+from mlpSearch import MLP
 
 # --- Argument Parsing ---
 parser = argparse.ArgumentParser(
@@ -221,6 +222,7 @@ for (
         print(f"\nTraining MLP model for {encoder}, repetition {rep_num}...")
         # Use a different random_state for the MLP model in each repetition for model variability
         automl_mlp = AutoML()
+        automl_mlp.add_learner(learner_name='mlp', learner_class=MLP)
         mlp_settings = {
             "time_budget": 60,  # in seconds
             "metric": 'r2',
