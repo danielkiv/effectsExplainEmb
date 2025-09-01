@@ -231,24 +231,20 @@ for (
             ["x_coord", "y_coord"]
         ].values
 
-        current_rep_model_metrics = {}  # For this repetition
+        current_rep_model_metrics = {} 
  
         print(f"\nTraining MLP model for {encoder}, repetition {rep_num}...")
         param_dist = {
             'hidden_layer_sizes': [(50,), (100,), (50, 50), (100, 50)],
             'activation': ['relu', 'tanh'],
             'solver': ['adam', 'sgd'],
-            'alpha': [10**-x for x in range(1, 6)],  # e.g., 0.1, 0.01, ..., 0.00001
-            'learning_rate_init': [10**-x for x in range(2, 5)], # e.g., 0.01, 0.001, 0.0001
+            'alpha': [10**-x for x in range(1, 6)], 
+            'learning_rate_init': [10**-x for x in range(2, 5)], 
             'max_iter': [500, 1000, 1500]
         }
 
-        # 2. Instantiate the MLP Regressor
         mlp = MLPRegressor(random_state=current_random_state_split)
 
-        # 3. Set up RandomizedSearchCV
-        # It will try 25 different combinations from param_dist, using 3-fold cross-validation
-        # n_jobs=-1 uses all available CPU cores to speed things up
         random_search = RandomizedSearchCV(
             estimator=mlp,
             param_distributions=param_dist,
@@ -257,15 +253,13 @@ for (
             scoring='r2',
             n_jobs=-1,
             random_state=current_random_state_split,
-            error_score='raise' # Will raise an error if something goes wrong
+            error_score='raise'
         )
 
         mlp_failed = False
         try:
-            # 4. Fit the model - This is the hyperparameter search
             random_search.fit(X_train_ml, y_train)
 
-            # 5. Get the best model and its parameters
             mlp_model = random_search.best_estimator_
             print(f"  Best MLP learner found with R2: {random_search.best_score_:.4f}")
             print(f"  Best MLP config: {random_search.best_params_}")
