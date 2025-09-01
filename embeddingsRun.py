@@ -1,19 +1,14 @@
-# embeddingsRun.py
-
 import numpy as np
 import pandas as pd
-import warnings
 import matplotlib.pyplot as plt
 import os
 import torch
 import argparse  # New: For command-line arguments
-import glob  # New: For finding repetition result files
 
 from geoshapley import GeoShapleyExplainer
 from help_utils import get_loc_embeddings, plot_s, calculate_spatial_metrics
 from sklearn.model_selection import train_test_split
-from sklearn.neural_network import MLPRegressor
-from xgboost import XGBRegressor
+from flaml import AutoML
 
 # --- Argument Parsing ---
 parser = argparse.ArgumentParser(
@@ -31,7 +26,7 @@ parser.add_argument(
 parser.add_argument(
     "--base_experiment_dir",
     type=str,
-    default="./results/trialEmbeddingFinalDraft",
+    default="./results/default",
     help="Base directory for all experiment results.",
 )
 args = parser.parse_args()
@@ -225,16 +220,20 @@ for (
         # --- MLP Model ---
         print(f"\nTraining MLP model for {encoder}, repetition {rep_num}...")
         # Use a different random_state for the MLP model in each repetition for model variability
-        mlp_model = MLPRegressor(
-            random_state=rep_num,
-            max_iter=600,
-            hidden_layer_sizes=(64, 32),
-            alpha=0.01,
-            early_stopping=True,
-        )  #
+        automl_mlp = AutoML()
+        mlp_settings = {
+            "time_budget": 60,  # in seconds
+            "metric": 'r2',
+            "task": 'regression',
+            "estimator_list": ['mlp'],
+            "verbose": 0, # Set to 3 for detailed logs
+        }
         mlp_failed = False
         try:
-            mlp_model.fit(X_train_ml, y_train)
+            automl_mlp.fit(X_train=X_train_ml, y_train=y_train, **mlp_settings)
+            print(f"  Best MLP learner: {automl_mlp.best_estimator}")
+            print(f"  Best MLP config: {automl_mlp.best_config}")
+            mlp_model = automl_mlp.model.estimator
             mlp_train_score = mlp_model.score(X_train_ml, y_train)
             mlp_test_score = mlp_model.score(X_test_ml, y_test)
             current_rep_model_metrics["MLP"] = {
@@ -259,12 +258,20 @@ for (
         # --- XGBoost Model ---
         print(f"\nTraining XGBoost model for {encoder}, repetition {rep_num}...")
         # Use a different random_state for XGBoost in each repetition
-        xgb_model = XGBRegressor(
-            random_state=rep_num, objective="reg:squarederror", n_estimators=100
-        )  #
+        automl_xgb = AutoML()
+        xgb_settings = {
+            "time_budget": 60,  # in seconds
+            "metric": 'r2',
+            "task": 'regression',
+            "estimator_list": ['xgboost'],
+             "verbose": 0,
+        }
         xgb_failed = False
         try:
-            xgb_model.fit(X_train_ml, y_train)
+            automl_xgb.fit(X_train=X_train_ml, y_train=y_train, **xgb_settings)
+            print(f"  Best XGBoost learner: {automl_xgb.best_estimator}")
+            print(f"  Best XGBoost config: {automl_xgb.best_config}")
+            xgb_model = automl_xgb.model.estimator
             xgb_train_score = xgb_model.score(X_train_ml, y_train)
             xgb_test_score = xgb_model.score(X_test_ml, y_test)
             current_rep_model_metrics["XGBoost"] = {
