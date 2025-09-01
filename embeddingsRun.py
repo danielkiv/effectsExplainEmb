@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import torch
-import argparse  # New: For command-line arguments
+import argparse
 
 from geoshapley import GeoShapleyExplainer
 from help_utils import get_loc_embeddings, plot_s, calculate_spatial_metrics
@@ -171,28 +171,29 @@ for (
         try:
             embeddings = get_loc_embeddings(
                 original_coords.values, encoder_type=encoder, device="cpu"
-            )  #
-            embeddings_np = (
-                embeddings.detach().cpu().numpy()
-                if isinstance(embeddings, torch.Tensor)
-                else np.array(embeddings)
             )
-            if np.isnan(embeddings_np).any() or np.isinf(embeddings_np).any():
-                print(
-                    f"Warning: NaN or Inf values found in embeddings for {encoder} on rep {rep_num}. Skipping this repetition."
+
+            # This correctly handles both regular and ragged embeddings by placing them 
+            # into a single DataFrame column without causing an early error.
+            if isinstance(embeddings, torch.Tensor):
+                embeddings_np = embeddings.detach().cpu().numpy()
+                emb_dim = embeddings_np.shape[1]
+                emb_cols = [f"{encoder}_emb_{i}" for i in range(emb_dim)]
+                X_embeddings = pd.DataFrame(
+                    embeddings_np, columns=emb_cols, index=original_coords.index
                 )
-                # Add NaN placeholders for this repetition if needed for aggregation later
-                continue
-            emb_dim = embeddings_np.shape[1]
-            emb_cols = [f"{encoder}_emb_{i}" for i in range(emb_dim)]
-            X_embeddings = pd.DataFrame(
-                embeddings_np, columns=emb_cols, index=original_coords.index
-            )
+            else:
+                # For ragged lists, put the list of arrays into one column
+                X_embeddings = pd.DataFrame(
+                    {"embeddings": list(embeddings)}, index=original_coords.index
+                )
+
         except Exception as e:
             print(
                 f"Error generating embeddings for {encoder} on rep {rep_num}: {e}. Skipping this repetition."
             )
-            # Add NaN placeholders
+            import traceback
+            traceback.print_exc()
             continue
 
         X_ml_features = pd.concat([X_features, X_embeddings], axis=1)
